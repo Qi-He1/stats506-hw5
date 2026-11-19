@@ -7,7 +7,7 @@ format:
 editor: visual
 ---
 
-## GitHub repository: <https://github.com/Qi-He1/stats506-hw4>
+## GitHub repository: <https://github.com/Qi-He1/stats506-hw5>
 
 ## **Problem 1 - OOP Programming**
 
@@ -535,7 +535,9 @@ try(sterr(ci1) <- -2)
 
 ```{r}
 library(data.table)
-
+tennis <- readr::read_csv(
+  "https://raw.githubusercontent.com/azhou5849/tennis-atp-sackmann-data/master/atp_matches_2019.csv"
+)
 setDT(tennis)
 
 result_2a <- tennis[
@@ -640,12 +642,14 @@ Among players with at least five matches, Rafael Nadal had the highest win rate,
 **a.**
 
 ```{r}
-install.packages("plotly")
-```
-
-```{r}
 library(tidyverse)
 library(plotly)
+covid <- read_csv(
+  "https://raw.githubusercontent.com/nytimes/covid-19-data/refs/heads/master/rolling-averages/us-states.csv"
+) %>%
+  mutate(
+    date = as.Date(date)
+  )
 ```
 
 ```{r}
@@ -737,7 +741,7 @@ plot_3b <- plot_ly(
 plot_3b
 ```
 
-Maine had the highest overall COVID-19 rate, while Rhode Island had the lowest. Their trajectories were different over time. Rhode Island experienced a much larger increase during the winter of 2021–2022, whereas Maine was less affected during that period.
+Rhode Island had the highest overall COVID-19 case rate, while Maine had the lowest. Their trajectories differed over time. Rhode Island experienced a much larger increase during the winter of 2021–2022, whereas Maine was less affected during that period.
 
 **c.**
 
