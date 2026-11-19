@@ -1,0 +1,825 @@
+---
+title: "Homework 5"
+author: "Qi He"
+format:
+  html:
+    self-contained: true
+editor: visual
+---
+
+## GitHub repository: <https://github.com/Qi-He1/stats506-hw4>
+
+## **Problem 1 - OOP Programming**
+
+**a.**
+
+```{r}
+library(methods)
+
+setClass(
+  "waldCI",
+  slots = c(
+    lb = "numeric",
+    ub = "numeric",
+    mean = "numeric",
+    sterr = "numeric",
+    level = "numeric"
+  )
+)
+```
+
+Validator
+
+```{r}
+setValidity(
+  "waldCI",
+  function(object) {
+    
+    values <- c(
+      object@lb,
+      object@ub,
+      object@mean,
+      object@sterr,
+      object@level
+    )
+    
+    if (length(object@lb) != 1 ||
+        length(object@ub) != 1 ||
+        length(object@mean) != 1 ||
+        length(object@sterr) != 1 ||
+        length(object@level) != 1) {
+      return("Each slot must contain exactly one value.")
+    }
+    
+    if (any(!is.finite(values))) {
+      return("All slot values must be finite.")
+    }
+    
+    if (object@level <= 0 || object@level >= 1) {
+      return("The confidence level must be between 0 and 1.")
+    }
+    
+    if (object@sterr < 0) {
+      return("The standard error cannot be negative.")
+    }
+    
+    if (object@lb > object@ub) {
+      return("The lower bound cannot exceed the upper bound.")
+    }
+    
+    if (object@mean < object@lb ||
+        object@mean > object@ub) {
+      return("The mean must lie between the two bounds.")
+    }
+    
+    TRUE
+  }
+)
+```
+
+```{r}
+##' Create a Wald-style confidence interval
+##'
+##' @param level Confidence level between 0 and 1.
+##' @param mean Estimated mean.
+##' @param sterr Standard error.
+##' @param lb Lower confidence bound.
+##' @param ub Upper confidence bound.
+##' @return A waldCI object.
+new_waldCI <- function(
+    level,
+    mean = NULL,
+    sterr = NULL,
+    lb = NULL,
+    ub = NULL
+) {
+  
+  if (length(level) != 1 ||
+      !is.numeric(level) ||
+      !is.finite(level) ||
+      level <= 0 ||
+      level >= 1) {
+    stop("level must be a single number between 0 and 1.")
+  }
+  
+  using_mean_se <- !is.null(mean) || !is.null(sterr)
+  using_bounds <- !is.null(lb) || !is.null(ub)
+  
+  if (using_mean_se && using_bounds) {
+    stop("Use either mean and sterr, or lb and ub, but not both.")
+  }
+  
+  if (!using_mean_se && !using_bounds) {
+    stop("Provide either mean and sterr, or lb and ub.")
+  }
+  
+  z_value <- qnorm((1 + level) / 2)
+  
+  if (using_mean_se) {
+    
+    if (is.null(mean) || is.null(sterr)) {
+      stop("Both mean and sterr must be provided.")
+    }
+    
+    if (length(mean) != 1 ||
+        length(sterr) != 1 ||
+        !is.numeric(mean) ||
+        !is.numeric(sterr) ||
+        !is.finite(mean) ||
+        !is.finite(sterr)) {
+      stop("mean and sterr must be single finite numbers.")
+    }
+    
+    if (sterr < 0) {
+      stop("sterr cannot be negative.")
+    }
+    
+    lb <- mean - z_value * sterr
+    ub <- mean + z_value * sterr
+    
+  } else {
+    
+    if (is.null(lb) || is.null(ub)) {
+      stop("Both lb and ub must be provided.")
+    }
+    
+    if (length(lb) != 1 ||
+        length(ub) != 1 ||
+        !is.numeric(lb) ||
+        !is.numeric(ub) ||
+        !is.finite(lb) ||
+        !is.finite(ub)) {
+      stop("lb and ub must be single finite numbers.")
+    }
+    
+    if (lb > ub) {
+      stop("lb cannot exceed ub.")
+    }
+    
+    mean <- (lb + ub) / 2
+    sterr <- (ub - lb) / (2 * z_value)
+  }
+  
+  new(
+    "waldCI",
+    lb = as.numeric(lb),
+    ub = as.numeric(ub),
+    mean = as.numeric(mean),
+    sterr = as.numeric(sterr),
+    level = as.numeric(level)
+  )
+}
+```
+
+`show` method
+
+```{r}
+setMethod(
+  "show",
+  "waldCI",
+  function(object) {
+    cat(
+      "Wald confidence interval\n",
+      "Mean: ", round(object@mean, 4), "\n",
+      "Standard error: ", round(object@sterr, 4), "\n",
+      "Confidence level: ", object@level, "\n",
+      "Interval: [",
+      round(object@lb, 4),
+      ", ",
+      round(object@ub, 4),
+      "]\n",
+      sep = ""
+    )
+    
+    invisible(object)
+  }
+)
+```
+
+Accessors
+
+```{r}
+setGeneric(
+  "lb",
+  function(object) standardGeneric("lb")
+)
+
+setGeneric(
+  "ub",
+  function(object) standardGeneric("ub")
+)
+
+setGeneric(
+  "mean",
+  function(object) standardGeneric("mean")
+)
+
+setGeneric(
+  "sterr",
+  function(object) standardGeneric("sterr")
+)
+
+setGeneric(
+  "level",
+  function(object) standardGeneric("level")
+)
+
+setMethod(
+  "lb",
+  "waldCI",
+  function(object) object@lb
+)
+
+setMethod(
+  "ub",
+  "waldCI",
+  function(object) object@ub
+)
+
+setMethod(
+  "mean",
+  "waldCI",
+  function(object) object@mean
+)
+
+setMethod(
+  "sterr",
+  "waldCI",
+  function(object) object@sterr
+)
+
+setMethod(
+  "level",
+  "waldCI",
+  function(object) object@level
+)
+```
+
+Setters
+
+```{r}
+setGeneric(
+  "lb<-",
+  function(object, value) standardGeneric("lb<-")
+)
+
+setGeneric(
+  "ub<-",
+  function(object, value) standardGeneric("ub<-")
+)
+
+setGeneric(
+  "mean<-",
+  function(object, value) standardGeneric("mean<-")
+)
+
+setGeneric(
+  "sterr<-",
+  function(object, value) standardGeneric("sterr<-")
+)
+
+setGeneric(
+  "level<-",
+  function(object, value) standardGeneric("level<-")
+)
+```
+
+```{r}
+update_bounds <- function(object) {
+  z <- qnorm((1 + object@level) / 2)
+  object@lb <- object@mean - z * object@sterr
+  object@ub <- object@mean + z * object@sterr
+  validObject(object)
+  object
+}
+
+setMethod("lb<-", "waldCI", function(object, value) {
+  object@lb <- as.numeric(value)
+  object@mean <- (object@lb + object@ub) / 2
+  z <- qnorm((1 + object@level) / 2)
+  object@sterr <- (object@ub - object@lb) / (2 * z)
+  validObject(object)
+  object
+})
+
+setMethod("ub<-", "waldCI", function(object, value) {
+  object@ub <- as.numeric(value)
+  object@mean <- (object@lb + object@ub) / 2
+  z <- qnorm((1 + object@level) / 2)
+  object@sterr <- (object@ub - object@lb) / (2 * z)
+  validObject(object)
+  object
+})
+
+setMethod("mean<-", "waldCI", function(object, value) {
+  object@mean <- as.numeric(value)
+  update_bounds(object)
+})
+
+setMethod("sterr<-", "waldCI", function(object, value) {
+  object@sterr <- as.numeric(value)
+  update_bounds(object)
+})
+
+setMethod("level<-", "waldCI", function(object, value) {
+  object@level <- as.numeric(value)
+  update_bounds(object)
+})
+```
+
+`contains` method
+
+```{r}
+setGeneric(
+  "contains",
+  function(object, value) standardGeneric("contains")
+)
+
+setMethod(
+  "contains",
+  "waldCI",
+  function(object, value) {
+    value >= object@lb & value <= object@ub
+  }
+)
+```
+
+`overlap` method
+
+```{r}
+setGeneric(
+  "overlap",
+  function(object1, object2) standardGeneric("overlap")
+)
+
+setMethod(
+  "overlap",
+  signature(object1 = "waldCI", object2 = "waldCI"),
+  function(object1, object2) {
+    max(object1@lb, object2@lb) <=
+      min(object1@ub, object2@ub)
+  }
+)
+```
+
+`as.numeric`
+
+```{r}
+setMethod(
+  "as.numeric",
+  "waldCI",
+  function(x) {
+    c(x@lb, x@ub)
+  }
+)
+```
+
+```{r}
+##' Transform a confidence interval
+##'
+##' @param object A waldCI object.
+##' @param fun A transformation function.
+##' @return A transformed waldCI object.
+transformCI <- function(object, fun) {
+  if (!inherits(object, "waldCI")) {
+    stop("object must be a waldCI object")
+  }
+
+  if (!is.function(fun)) {
+    stop("fun must be a function")
+  }
+
+  warning(
+    "Only monotonic transformations produce valid transformed intervals."
+  )
+
+  new_waldCI(
+    level = level(object),
+    mean = fun(mean(object)),
+    sterr = fun(sterr(object))
+  )
+}
+```
+
+`transformCI`
+
+```{r}
+ci1 <- new_waldCI(
+  level = 0.95,
+  lb = 17.2,
+  ub = 24.7
+)
+
+ci2 <- new_waldCI(
+  level = 0.99,
+  mean = 13,
+  sterr = 2.5
+)
+
+ci3 <- new_waldCI(
+  level = 0.75,
+  lb = 27.43,
+  ub = 39.22
+)
+
+ci1
+ci2
+ci3
+
+as.numeric(ci1)
+as.numeric(ci2)
+as.numeric(ci3)
+
+lb(ci2)
+ub(ci2)
+mean(ci1)
+sterr(ci3)
+level(ci2)
+```
+
+**b.**
+
+```{r}
+ci1 <- new_waldCI(
+  level = 0.95,
+  lb = 17.2,
+  ub = 24.7
+)
+
+ci2 <- new_waldCI(
+  level = 0.99,
+  mean = 13,
+  sterr = 2.5
+)
+
+ci3 <- new_waldCI(
+  level = 0.75,
+  lb = 27.43,
+  ub = 39.22
+)
+```
+
+```{r}
+ci1
+ci2
+ci3
+
+as.numeric(ci1)
+as.numeric(ci2)
+as.numeric(ci3)
+
+lb(ci2)
+ub(ci2)
+mean(ci1)
+sterr(ci3)
+level(ci2)
+```
+
+```{r}
+lb(ci2) <- 10.5
+
+mean(ci3) <- 34
+
+level(ci3) <- 0.8
+
+contains(ci1, 17)
+
+contains(ci3, 44)
+
+overlap(ci1, ci2)
+
+eci1 <- transformCI(ci1, sqrt)
+
+eci1
+
+mean(transformCI(ci2, log))
+```
+
+**c.**
+
+```{r}
+## Test invalid objects
+
+try(
+  new_waldCI(
+    level = 0.95,
+    mean = 10,
+    sterr = -1
+  )
+)
+
+try(
+  new_waldCI(
+    level = 0.95,
+    lb = 20,
+    ub = 10
+  )
+)
+
+try(
+  new_waldCI(
+    level = 0.95,
+    lb = -Inf,
+    ub = 10
+  )
+)
+
+
+try(sterr(ci1) <- -2)
+
+```
+
+## **Problem 2 - data.table**
+
+**a.**
+
+```{r}
+library(data.table)
+
+setDT(tennis)
+
+result_2a <- tennis[
+  ,
+  .(
+    number_of_tournaments =
+      uniqueN(tourney_name)
+  )
+]
+
+result_2a
+
+result_2a_final <- tennis[
+  ,
+  .(
+    number_of_tournaments =
+      uniqueN(
+        fifelse(
+          grepl("Davis Cup", tourney_name),
+          "Davis Cup",
+          tourney_name
+        )
+      )
+  )
+]
+
+result_2a_final
+```
+
+Initially, there were 128 distinct tournament names. After combining the different Davis Cup round names into one tournament, there were 69 unique tournaments.
+
+**b.**
+
+```{r}
+final_winners <- tennis[
+  round == "F",
+  .(wins = .N),
+  by = winner_name
+][
+  order(-wins)
+]
+
+final_winners[wins > 1, .N]
+final_winners[1:3]
+```
+
+Twelve players won more than one tournament. Novak Djokovic and Dominic Thiem won the most tournaments, with 5 wins each, followed by Daniil Medvedev with 4 wins.
+
+**c.**
+
+```{r}
+ace_data <- tennis[
+  ,
+  .(winner_more_aces = w_ace > l_ace)
+]
+
+ace_test <- prop.test(
+  x = sum(ace_data$winner_more_aces, na.rm = TRUE),
+  n = sum(!is.na(ace_data$winner_more_aces)),
+  p = 0.5
+)
+
+ace_test
+```
+
+The p-value is much smaller than 0.05. The data provide strong evidence that winners are more likely to have more aces than losers.
+
+**d.**
+
+```{r}
+players <- melt(
+  tennis,
+  measure.vars = c("winner_name", "loser_name"),
+  value.name = "player"
+)
+
+players[
+  ,
+  won := variable == "winner_name"
+]
+
+win_rates <- players[
+  ,
+  .(
+    matches = .N,
+    win_rate = mean(won)
+  ),
+  by = player
+][
+  matches >= 5
+][
+  order(-win_rate)
+]
+
+win_rates[1:2]
+```
+
+Among players with at least five matches, Rafael Nadal had the highest win rate, winning 86.96% of his 69 matches.
+
+## **Problem 3 - plotly**
+
+**a.**
+
+```{r}
+install.packages("plotly")
+```
+
+```{r}
+library(tidyverse)
+library(plotly)
+```
+
+```{r}
+daily_cases <- covid %>%
+  group_by(date) %>%
+  summarise(
+    total_cases = sum(cases_avg, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+```{r}
+plot_3a <- plot_ly(
+  daily_cases,
+  x = ~date,
+  y = ~total_cases,
+  type = "scatter",
+  mode = "lines",
+  line = list(width = 2),
+  hovertemplate = paste(
+    "Date: %{x}",
+    "<br>Average daily cases: %{y:,.0f}",
+    "<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "Daily COVID-19 Cases in the United States",
+    xaxis = list(title = "Date"),
+    yaxis = list(
+      title = "Average Daily Cases",
+      tickformat = ","
+    )
+  )
+
+plot_3a
+```
+
+There were approximately four major spikes and four minor spikes in cases.
+
+**b.**
+
+```{r}
+state_totals <- covid %>%
+  group_by(state) %>%
+  summarise(
+    total_rate = sum(cases_avg_per_100k, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(total_rate))
+
+highest_state <- state_totals %>%
+  slice_max(total_rate, n = 1)
+
+lowest_state <- state_totals %>%
+  slice_min(total_rate, n = 1)
+
+highest_state
+lowest_state
+
+comparison <- covid %>%
+  filter(
+    state %in% c(
+      highest_state$state,
+      lowest_state$state
+    )
+  )
+
+plot_3b <- plot_ly(
+  comparison,
+  x = ~date,
+  y = ~cases_avg_per_100k,
+  color = ~state,
+  type = "scatter",
+  mode = "lines",
+  hovertemplate = paste(
+    "State: %{fullData.name}",
+    "<br>Date: %{x}",
+    "<br>Cases per 100,000: %{y:.2f}",
+    "<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "COVID-19 Case Rates in the Highest- and Lowest-Rate States",
+    xaxis = list(title = "Date"),
+    yaxis = list(title = "Daily Cases per 100,000 People"),
+    legend = list(title = list(text = "State"))
+  )
+
+plot_3b
+```
+
+Maine had the highest overall COVID-19 rate, while Rhode Island had the lowest. Their trajectories were different over time. Rhode Island experienced a much larger increase during the winter of 2021–2022, whereas Maine was less affected during that period.
+
+**c.**
+
+```{r}
+library(tidyverse)
+library(plotly)
+
+covid_early <- covid %>%
+  filter(
+    lubridate::year(date) == 2020,
+    lubridate::month(date) %in% 3:5
+  )
+
+first_substantial <- covid_early %>%
+  filter(cases_avg_per_100k > 20) %>%
+  group_by(state) %>%
+  summarise(
+    first_date = min(date),
+    .groups = "drop"
+  ) %>%
+  arrange(first_date)
+
+top_states <- first_substantial %>%
+  slice_head(n = 8) %>%
+  pull(state)
+
+plot_data <- covid_early %>%
+  filter(!is.na(cases_avg_per_100k))
+
+top_order <- plot_data %>%
+  filter(state %in% top_states) %>%
+  group_by(state) %>%
+  summarise(
+    max_rate = max(cases_avg_per_100k, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(max_rate)) %>%
+  pull(state)
+
+state_order <- c(
+  top_order,
+  setdiff(sort(unique(plot_data$state)), top_order)
+)
+
+plot_data <- plot_data %>%
+  mutate(
+    state = factor(state, levels = state_order)
+  )
+
+state_colors <- setNames(
+  rep("grey75", length(state_order)),
+  state_order
+)
+
+state_colors[top_order] <- scales::hue_pal()(
+  length(top_order)
+)
+
+plot_3c <- plot_ly(
+  plot_data,
+  x = ~date,
+  y = ~cases_avg_per_100k,
+  split = ~state,
+  color = ~state,
+  colors = state_colors,
+  type = "scatter",
+  mode = "lines",
+  hovertemplate = paste(
+    "State: %{fullData.name}",
+    "<br>Date: %{x}",
+    "<br>Cases per 100,000: %{y:.2f}",
+    "<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "Early COVID-19 Cases by State",
+    xaxis = list(title = "Date"),
+    yaxis = list(title = "Cases per 100,000 People"),
+    legend = list(title = list(text = "State"))
+  )
+
+plot_3c
+```
+
+I defined substantial COVID-19 activity as a daily case rate above 20 cases per 100,000 people. I filtered the data using this threshold, calculated the first date on which each state or territory exceeded it, and sorted the results chronologically. The first five were New York, New Jersey, Louisiana, Connecticut, and Guam. The plot also shows that these five regions reached relatively high case rates early in the pandemic. In addition, Massachusetts, ranked sixth, and Rhode Island, ranked seventh, were also quite close to the top five.
